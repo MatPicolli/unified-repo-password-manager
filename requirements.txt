@@ -1,0 +1,6 @@
+PyGithub
+cryptography
+pandas
+keyring
+fuzzywuzzy
+python-Levenshtein
