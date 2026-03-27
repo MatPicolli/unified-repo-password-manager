@@ -420,7 +420,9 @@ class PasswordManagerApp:
 
         try:
             # Importar conforme senhas.csv (sem cabeçalho)
-            imported_df = pd.read_csv(file_path, header=None, names=self.columns)
+            imported_df = pd.read_csv(
+                file_path, header=None, names=self.columns, encoding="latin-1"
+            )
             if messagebox.askyesno(
                 "Importar", f"Deseja importar {len(imported_df)} registros?"
             ):
