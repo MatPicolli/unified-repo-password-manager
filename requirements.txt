@@ -4,3 +4,4 @@ pandas
 keyring
 fuzzywuzzy
 python-Levenshtein
+pyzipper
