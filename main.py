@@ -499,11 +499,40 @@ class PasswordManagerApp:
                 )
                 return
 
-            if messagebox.askyesno(
-                "Importar", f"Deseja importar {len(imported_df)} registos?"
-            ):
-                self.df = pd.concat([self.df, imported_df], ignore_index=True)
+            # Padroniza valores nulos para strings vazias para uma comparação segura de duplicados
+            self.df = self.df.fillna("")
+            imported_df = imported_df.fillna("")
+
+            # Salva o comprimento atual para comparar depois
+            original_len = len(self.df)
+
+            # Combina os dois DataFrames
+            combined_df = pd.concat([self.df, imported_df], ignore_index=True)
+
+            # Remove os registos duplicados exatos (mantém o primeiro que encontrar, ignorando os importados repetidos)
+            combined_df = combined_df.drop_duplicates(keep="first", ignore_index=True)
+
+            # Calcula estatísticas da importação
+            new_records_count = len(combined_df) - original_len
+            ignored_count = len(imported_df) - new_records_count
+
+            # Se não há nada novo
+            if new_records_count == 0:
+                messagebox.showinfo(
+                    "Importação Concluída",
+                    "Nenhum registo novo encontrado.\nTodos os dados deste ficheiro já existem no seu banco.",
+                )
+                return
+
+            # Mensagem personalizada baseada no resultado da filtragem
+            msg = f"Deseja importar {new_records_count} novos registos?"
+            if ignored_count > 0:
+                msg += f"\n\n({ignored_count} registos duplicados foram encontrados e serão ignorados)."
+
+            if messagebox.askyesno("Confirmar Importação", msg):
+                self.df = combined_df
                 self.apply_filter()
+
         except Exception as e:
             messagebox.showerror("Erro na Importação", f"Erro ao ler ficheiro: {e}")
 
