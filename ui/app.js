@@ -3,7 +3,54 @@ const win = window.__TAURI__.window.getCurrentWindow();
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 
-const IDLE_LOCK_MS = 10 * 60_000;
+// ---------- settings (Configurações): stored on this computer, applied live ----------
+const SETTINGS_KEY = "urpm:settings";
+const DEFAULT_SETTINGS = { theme: "dark", accent: "#7c6cff", autosave: false, lockMinutes: 10, clipSeconds: 30 };
+const ACCENTS = [["#7c6cff", "Roxo"], ["#4c8dff", "Azul"], ["#22b8cf", "Ciano"], ["#2fbf71", "Verde"], ["#f59f00", "Âmbar"], ["#ff6b6b", "Coral"], ["#e64980", "Rosa"]];
+const AUTOSAVE_MS = 2500;
+
+const SETTINGS = (() => {
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}; } catch {}
+  const s = { ...DEFAULT_SETTINGS, ...saved };
+  // Never trust stored values blindly (a broken value must not disable the lock, for example).
+  if (!["dark", "light", "system"].includes(s.theme)) s.theme = DEFAULT_SETTINGS.theme;
+  if (!/^#[0-9a-f]{6}$/i.test(s.accent)) s.accent = DEFAULT_SETTINGS.accent;
+  s.autosave = s.autosave === true;
+  if (![1, 5, 10, 15, 30, 60].includes(s.lockMinutes)) s.lockMinutes = DEFAULT_SETTINGS.lockMinutes;
+  if (![10, 30, 60, 120].includes(s.clipSeconds)) s.clipSeconds = DEFAULT_SETTINGS.clipSeconds;
+  return s;
+})();
+const saveSettings = () => localStorage.setItem(SETTINGS_KEY, JSON.stringify(SETTINGS));
+
+const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+const mix = (c, to, t) => c.map((v, i) => Math.round(v + (to[i] - v) * t));
+const css = (c) => "rgb(" + c.join(",") + ")";
+const luminance = (c) => {
+  const [r, g, b] = c.map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const systemLight = matchMedia("(prefers-color-scheme: light)");
+
+/** Theme + every accent shade derived from the one chosen color (darker on light backgrounds for contrast). */
+function applyAppearance() {
+  const theme = SETTINGS.theme === "system" ? (systemLight.matches ? "light" : "dark") : SETTINGS.theme;
+  const root = document.documentElement;
+  root.dataset.theme = theme;
+  const base = rgb(SETTINGS.accent), light = theme === "light";
+  const accent = light ? mix(base, [0, 0, 0], 0.12) : base;
+  root.style.setProperty("--accent", css(accent));
+  root.style.setProperty("--accent-hi", css(light ? mix(base, [0, 0, 0], 0.25) : mix(base, [255, 255, 255], 0.18)));
+  root.style.setProperty("--accent-deep", css(mix(base, [0, 0, 0], 0.3)));
+  root.style.setProperty("--accent-soft", "rgba(" + base.join(",") + "," + (light ? 0.12 : 0.16) + ")");
+  const ratio = (a, b) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  const L = luminance(accent), darkText = ratio(L, luminance([20, 22, 28])) > ratio(L, 1);
+  root.style.setProperty("--on-accent", darkText ? "#14161c" : "#fff");
+  // Button hover keeps (or improves) the text contrast.
+  root.style.setProperty("--accent-hover", css(darkText ? mix(accent, [255, 255, 255], 0.15) : mix(accent, [0, 0, 0], 0.14)));
+}
+systemLight.addEventListener("change", () => { if (SETTINGS.theme === "system") applyAppearance(); });
+applyAppearance();
 const CONFLICT = "O cofre foi alterado em outro dispositivo."; // = github::CONFLICT
 const NEEDS_VAULT_PASSWORD = "Este cofre tem uma senha própria."; // = crypto::NEEDS_VAULT_PASSWORD
 const VAULT_NAME = /^[\p{L}\p{N} _-]{1,48}$/u;               // = valid_name() in main.rs
@@ -72,9 +119,92 @@ function toast(msg, err = false) {
 async function call(cmd, args) {
   S.busy++;
   document.body.classList.add("busy");
+  renderSync();
   try { return await invoke(cmd, args); }
-  finally { if (--S.busy === 0) document.body.classList.remove("busy"); }
+  finally {
+    if (--S.busy === 0) document.body.classList.remove("busy");
+    renderSync();
+  }
 }
+
+// ---------- sync indicator (titlebar) ----------
+// remote: what GitHub has vs. the open vault ("same" | "changed" | "deleted"); error: last check failed.
+// conflict: the user declined a merge, so autosave must not keep re-asking until something changes.
+const SYNC = { remote: "same", error: false, conflict: false, checkedAt: null, lastCheck: 0, pending: null };
+const SYNC_POLL_MS = 30_000;
+
+function renderSync() {
+  const time = SYNC.checkedAt ? SYNC.checkedAt.toLocaleTimeString("pt-BR") : null;
+  const [cls, label, tip] =
+    S.busy ? ["warn busy", "Sincronizando…", "Trocando dados com o GitHub."]
+    : S.dirty && SYNC.conflict ? ["warn", "Não sincronizado", "O cofre mudou em outro dispositivo e há alterações aqui. Clique para mesclar e salvar."]
+    : S.dirty ? ["warn", "Não sincronizado", "Há alterações que ainda não foram salvas no GitHub. Clique para salvar (Ctrl+S)."]
+    : SYNC.remote === "changed" ? ["warn", "Não sincronizado", "O cofre foi alterado em outro dispositivo. Clique para baixar a versão nova."]
+    : SYNC.remote === "deleted" ? ["warn", "Não sincronizado", "Este cofre foi apagado em outro dispositivo."]
+    : SYNC.error ? ["warn", "Não sincronizado", "Não foi possível falar com o GitHub agora. Clique para tentar de novo."]
+    : ["ok", "Sincronizado", S.current ? `Tudo salvo no GitHub.${time ? ` Verificado às ${time}.` : ""}` : "Conectado ao GitHub."];
+  const b = $("#sync");
+  b.className = `sync main-only ${cls}`;
+  $(".sync-label", b).textContent = label;
+  b.title = tip;
+  b.setAttribute("aria-label", `${label}. ${tip}`);
+}
+
+/** The open vault now matches GitHub (just opened, saved or reloaded). */
+function markSynced() {
+  Object.assign(SYNC, { remote: "same", error: false, conflict: false, checkedAt: new Date() });
+  renderSync();
+}
+
+/** Asks GitHub whether the open vault changed elsewhere. Quiet: no progress bar, no toasts. */
+function checkRemote() {
+  if (SYNC.pending) return SYNC.pending; // one check at a time; a click waits for the one already running
+  const name = S.current;
+  if (!name || S.busy || !document.body.classList.contains("mode-app")) return Promise.resolve();
+  // With autosave on, the poll also retries a save that failed earlier (e.g. offline for a moment).
+  if (SETTINGS.autosave && S.dirty && !SYNC.conflict && !S.discarded) return Promise.resolve(autosaveNow());
+  SYNC.lastCheck = Date.now();
+  SYNC.pending = (async () => {
+    try {
+      const remote = await invoke("remote_status", { name });
+      if (name !== S.current) return; // switched vaults meanwhile
+      Object.assign(SYNC, { remote, error: false, checkedAt: new Date() });
+    } catch {
+      if (name !== S.current) return;
+      SYNC.error = true;
+    }
+    renderSync();
+  })().finally(() => { SYNC.pending = null; });
+  return SYNC.pending;
+}
+setInterval(checkRemote, SYNC_POLL_MS);
+
+/** Replaces the open vault with GitHub's version (asks for its password if it changed elsewhere). */
+async function reloadCurrent() {
+  const entries = await fetchVault(S.current);
+  if (!entries) return false;
+  S.entries = entries;
+  S.sel = -1;
+  S.editing = null;
+  $("#editor").classList.add("hidden");
+  setDirty(false);
+  markSynced();
+  showVault();
+  return true;
+}
+
+$("#sync").onclick = async () => {
+  if (S.busy) return;
+  if (S.dirty || (S.editing && S.touched)) return save(); // a remote change too ends in the merge dialog
+  if (SYNC.remote === "deleted") return toast("Este cofre foi apagado em outro dispositivo. Use ⋯ → Exportar CSV se quiser guardar os itens.", true);
+  if (SYNC.remote === "changed") {
+    if (S.editing) closeEditor();
+    if (await reloadCurrent()) toast("Cofre atualizado com a versão do GitHub.");
+    return;
+  }
+  await checkRemote();
+  if (S.current && !SYNC.error && SYNC.remote === "same") toast("Tudo sincronizado com o GitHub.");
+};
 
 let pendingModal = null; // resolver of the dialog currently open, so a newer one cancels it instead of orphaning it
 
@@ -122,6 +252,7 @@ async function confirmDiscard() {
       message: S.dirty ? `O cofre "${S.current}" tem alterações que ainda não foram salvas no GitHub.` : "O item em edição ainda não foi concluído.",
     });
     if (!ok) return false;
+    if (S.dirty) stopAutosave();
   }
   if (S.editing) closeEditor();
   return true;
@@ -130,8 +261,10 @@ async function confirmDiscard() {
 async function copy(text, what, btn) {
   if (!text) return toast(`${what} vazio.`, true);
   try {
-    await invoke("copy_secret", { text }); // Rust clears it after 30 s, even with the window in the background
-    toast(`${what} copiado · limpo em 30 s`);
+    // Rust clears it after the configured time, even with the window in the background.
+    await invoke("copy_secret", { text, seconds: SETTINGS.clipSeconds });
+    const t = SETTINGS.clipSeconds;
+    toast(what + " copiado · limpo em " + (t < 60 ? t + " s" : t / 60 + " min"));
     if (btn) {
       btn.classList.add("copied");
       btn.querySelector("use").setAttribute("href", "#i-check");
@@ -161,7 +294,12 @@ let pendingLayout = null;
 async function layout(main) {
   pendingLayout = (await invoke("set_layout", { main })) ? null : main;
 }
-win.onFocusChanged(({ payload: focused }) => { if (focused && pendingLayout !== null) layout(pendingLayout); });
+win.onFocusChanged(({ payload: focused }) => {
+  if (!focused) return;
+  if (pendingLayout !== null) layout(pendingLayout);
+  // Coming back to the window is when another device's changes matter: check now (at most every 5 s).
+  if (Date.now() - SYNC.lastCheck > 5000) checkRemote();
+});
 
 // Show/hide buttons for password inputs.
 $$("[data-reveal]").forEach((b) => (b.onclick = () => {
@@ -301,11 +439,14 @@ async function lock(reason) {
   if (pendingModal) { pendingModal(null); pendingModal = null; }
   if ($("#modal").open) $("#modal").close();
   if (pendingVaultDialog) { pendingVaultDialog(null); pendingVaultDialog = null; }
+  if ($("#settings").open) $("#settings").close();
+  SYNC.conflict = false;
   if ($("#vault-dialog").open) $("#vault-dialog").close();
   $("#setup").classList.add("hidden");
   $("#modal-input").value = $("#setup-master").value = $("#setup-confirm").value = "";
   $("#vault-form").reset();
   S.locked.clear();
+  Object.assign(SYNC, { remote: "same", error: false, checkedAt: null });
   Object.assign(S, { vaults: [], current: null, entries: [], visible: [], sel: -1, editing: null, touched: false, revealed: false, filter: { type: "all", tag: "" } });
   setDirty(false);
   // Don't leave decrypted data sitting in hidden DOM nodes.
@@ -330,7 +471,7 @@ function resetIdle() {
   clearTimeout(idleTimer);
   idleTimer = setTimeout(() => {
     if (document.body.classList.contains("mode-app")) lock(`Bloqueado por inatividade${S.dirty ? " (alterações não salvas foram descartadas)" : ""}.`);
-  }, IDLE_LOCK_MS);
+  }, SETTINGS.lockMinutes * 60_000);
 }
 ["mousemove", "keydown", "mousedown", "wheel"].forEach((e) => addEventListener(e, resetIdle, { passive: true }));
 resetIdle();
@@ -385,6 +526,7 @@ async function openVault(name) {
   Object.assign(S, { current: name, sel: -1, filter: { type: "all", tag: "" } });
   $("#search").value = "";
   setDirty(false);
+  markSynced();
   showVault();
 }
 
@@ -437,6 +579,7 @@ async function newVault() {
     S.vaults = await call("list_vaults");
     // The user already agreed to discard the previous vault: leave it now, so a failed open below isn't left half-shown.
     Object.assign(S, { current: null, entries: [], sel: -1 });
+    Object.assign(SYNC, { remote: "same", error: false });
     setDirty(false);
     showVault();
     await openVault(r.name); // key is cached: no password prompt right after creating
@@ -453,6 +596,7 @@ async function vaultPassword() {
   try {
     await call("set_vault_password", { name, password: r.password, entries: S.entries });
     if (r.password) S.locked.add(name); else S.locked.delete(name);
+    markSynced();
     renderVaults();
     toast(r.password ? "Senha do cofre definida." : "Senha do cofre removida.");
   } catch (e) { toast(e, true); }
@@ -472,6 +616,7 @@ async function deleteVault() {
     await call("delete_vault", { name });
     S.vaults = S.vaults.filter((v) => v !== name);
     S.locked.delete(name);
+    Object.assign(SYNC, { remote: "same", error: false });
     Object.assign(S, { current: null, entries: [], sel: -1, editing: null });
     $("#editor").classList.add("hidden");
     setDirty(false);
@@ -484,24 +629,54 @@ async function deleteVault() {
 function setDirty(d) {
   if (d) S.version++;
   S.dirty = d;
+  S.discarded = false; // a new edit (or a clean state) ends a pending "discard"
   $("#unsaved").classList.toggle("hidden", !d);
+  renderSync();
+  if (d) scheduleAutosave();
 }
 
-async function save() {
+// Autosave: a few seconds after the last change, quietly (the titlebar indicator shows the result).
+let autosaveTimer;
+function scheduleAutosave() {
+  clearTimeout(autosaveTimer);
+  if (SETTINGS.autosave) autosaveTimer = setTimeout(autosaveNow, AUTOSAVE_MS);
+}
+/** The user chose to discard the current changes: autosave must not upload them, whatever happens next. */
+function stopAutosave() {
+  clearTimeout(autosaveTimer);
+  S.discarded = true;
+}
+function autosaveNow() {
+  if (!SETTINGS.autosave || !S.dirty || !S.current || S.discarded || SYNC.conflict) return;
+  // Never interrupt the user: wait while an item is being edited, a dialog is open or something is running.
+  const blocked = S.editing || S.busy || $("#modal").open || $("#vault-dialog").open;
+  if (blocked) return scheduleAutosave();
+  save({ quiet: true });
+}
+
+async function save({ quiet = false } = {}) {
   // An item still open in the editor is committed first (a merge below replaces S.entries, so no stale editor index may survive).
   if (S.editing) { form.requestSubmit(); if (S.editing) return; }
   if (!S.current || !S.dirty) return;
   const sent = S.version;
   try {
     await call("save_vault", { name: S.current, entries: S.entries });
-    toast("Salvo no GitHub.");
+    markSynced();
+    if (!quiet) toast("Salvo no GitHub.");
   } catch (e) {
-    if (String(e) !== CONFLICT) return toast(e, true);
+    if (String(e) !== CONFLICT) {
+      if (!quiet) return toast(e, true);
+      SYNC.error = true; // autosave failure: the indicator turns yellow and the next poll retries
+      return renderSync();
+    }
     const merge = await modal({
       title: "Cofre alterado em outro dispositivo", ok: "Mesclar e salvar",
       message: "Nada se perde: os itens que só existem aqui são acrescentados à versão do GitHub. Itens excluídos aqui podem reaparecer e itens editados podem ficar duplicados.",
     });
-    if (!merge) return;
+    if (!merge) {
+      Object.assign(SYNC, { conflict: true, remote: "changed" });
+      return renderSync();
+    }
     try {
       const remote = await fetchVault(S.current); // also refreshes the sha (and asks for a new vault password if it changed)
       if (!remote) return;
@@ -510,6 +685,7 @@ async function save() {
       S.entries = remote.concat(added);
       S.sel = -1;
       await call("save_vault", { name: S.current, entries: S.entries });
+      markSynced();
       showVault();
       toast(`Mesclado e salvo (${added.length} ${added.length === 1 ? "item acrescentado" : "itens acrescentados"}).`);
     } catch (e2) { return toast(e2, true); }
@@ -520,16 +696,8 @@ $("#save").onclick = save;
 
 $("#discard").onclick = async () => {
   if (!(await modal({ title: "Descartar alterações?", message: "O cofre volta para a última versão salva no GitHub.", ok: "Descartar", danger: true }))) return;
-  try {
-    const entries = await fetchVault(S.current);
-    if (!entries) return;
-    S.entries = entries;
-    S.sel = -1;
-    S.editing = null;
-    $("#editor").classList.add("hidden");
-    setDirty(false);
-    showVault();
-  } catch (e) { toast(e, true); }
+  stopAutosave();
+  await reloadCurrent();
 };
 
 // ---------- filters & list ----------
@@ -815,7 +983,8 @@ async function exportCsv() {
 addEventListener("keydown", async (ev) => {
   // WebView2 keeps browser reload keys; a reload would drop unsaved changes without asking.
   if (ev.key === "F5" || ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "r")) return ev.preventDefault();
-  if ($("#modal").open || $("#vault-dialog").open || !document.body.classList.contains("mode-app") || S.busy) return;
+  if ((ev.ctrlKey || ev.metaKey) && ev.key === "," && !$("#modal").open && !$("#vault-dialog").open) { ev.preventDefault(); return openSettings(); }
+  if ($("#modal").open || $("#vault-dialog").open || $("#settings").open || !document.body.classList.contains("mode-app") || S.busy) return;
   const k = ev.key.toLowerCase(), ctrl = ev.ctrlKey || ev.metaKey;
 
   if (S.editing) {
@@ -840,6 +1009,59 @@ addEventListener("keydown", async (ev) => {
   else if (k === "delete" && S.entries[S.sel] && !typing()) { ev.preventDefault(); deleteEntry(); }
   else if (k === "escape" && document.activeElement === $("#search")) { $("#search").value = ""; renderList(); $("#search").blur(); }
 });
+
+// ---------- settings panel ----------
+const sform = $("#settings-form");
+
+function renderSettings() {
+  sform.elements.theme.value = SETTINGS.theme;
+  sform.elements.autosave.checked = SETTINGS.autosave;
+  sform.elements.lockMinutes.value = String(SETTINGS.lockMinutes);
+  sform.elements.clipSeconds.value = String(SETTINGS.clipSeconds);
+  const preset = ACCENTS.some(([c]) => c === SETTINGS.accent);
+  const custom = el("label", { class: "swatch-custom" + (preset ? "" : " active"), title: "Outra cor…" },
+    icon("plus"), el("input", { type: "color", value: SETTINGS.accent, "aria-label": "Outra cor" }));
+  if (!preset) custom.style.background = SETTINGS.accent;
+  $("input", custom).oninput = (ev) => setAccent(ev.target.value, false);
+  $("input", custom).onchange = (ev) => setAccent(ev.target.value);
+  $("#accent-swatches").replaceChildren(
+    ...ACCENTS.map(([c, name]) => {
+      const b = el("button", { type: "button", class: "swatch-btn" + (c === SETTINGS.accent ? " active" : ""), title: name, "aria-label": name, onclick: () => setAccent(c) });
+      b.style.background = c;
+      return b;
+    }),
+    custom,
+  );
+}
+
+/** Live preview while dragging the color picker (persist=false), saved on release. */
+function setAccent(color, persist = true) {
+  SETTINGS.accent = color.toLowerCase();
+  applyAppearance();
+  if (persist) { saveSettings(); renderSettings(); }
+}
+
+sform.addEventListener("change", (ev) => {
+  const t = ev.target;
+  if (t.type === "color") return; // handled by setAccent
+  if (t.name === "theme") SETTINGS.theme = t.value;
+  if (t.name === "autosave") {
+    SETTINGS.autosave = t.checked;
+    if (t.checked && S.dirty) scheduleAutosave();
+  }
+  if (t.name === "lockMinutes") { SETTINGS.lockMinutes = +t.value; resetIdle(); }
+  if (t.name === "clipSeconds") SETTINGS.clipSeconds = +t.value;
+  saveSettings();
+  applyAppearance();
+});
+
+function openSettings() {
+  if ($("#settings").open) return;
+  renderSettings();
+  $("#settings").showModal();
+}
+$("#settings-btn").onclick = openSettings;
+$("#settings-close").onclick = () => $("#settings").close();
 
 // A page (re)load always starts locked, in the small login layout.
 (async () => {

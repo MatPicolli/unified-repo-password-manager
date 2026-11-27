@@ -38,7 +38,6 @@ struct AppState(Mutex<Option<Session>>);
 #[derive(Default)]
 struct LastCopy(Mutex<Option<String>>);
 
-const CLIPBOARD_CLEAR: std::time::Duration = std::time::Duration::from_secs(30);
 
 /// Clears the clipboard only if it still holds `text` (never wipes something the user copied later).
 fn clear_clipboard_if(text: &str) {
@@ -266,9 +265,9 @@ fn lock(app: tauri::AppHandle, state: State<AppState>) {
     }
 }
 
-/// Copies a secret, kept out of Windows clipboard history/cloud sync, and wipes it after 30 s.
+/// Copies a secret, kept out of Windows clipboard history/cloud sync, and wipes it after `seconds` (5–600).
 #[tauri::command]
-fn copy_secret(app: tauri::AppHandle, text: String) -> R<()> {
+fn copy_secret(app: tauri::AppHandle, text: String, seconds: u64) -> R<()> {
     let mut cb = arboard::Clipboard::new().map_err(|e| format!("Área de transferência indisponível: {e}"))?;
     #[cfg(windows)]
     let set = {
@@ -280,7 +279,7 @@ fn copy_secret(app: tauri::AppHandle, text: String) -> R<()> {
     set.map_err(|e| format!("Não foi possível copiar: {e}"))?;
     *app.state::<LastCopy>().0.lock().map_err(|_| "Estado interno corrompido.")? = Some(text.clone());
     std::thread::spawn(move || {
-        std::thread::sleep(CLIPBOARD_CLEAR);
+        std::thread::sleep(std::time::Duration::from_secs(seconds.clamp(5, 600)));
         clear_clipboard_if(&text);
     });
     Ok(())
@@ -295,6 +294,22 @@ fn list_vaults(state: State<AppState>) -> R<Vec<String>> {
 #[tauri::command(async)]
 fn open_vault(state: State<AppState>, name: String, password: Option<String>) -> R<Vec<Entry>> {
     with(&state, |s| load(s, &name, password.as_deref()))
+}
+
+/// Compares the open vault with GitHub: "same", "changed" (saved on another device) or "deleted".
+#[tauri::command(async)]
+fn remote_status(state: State<AppState>, name: String) -> R<&'static str> {
+    // Copy what's needed and release the session lock before the network call: a slow background
+    // check must never delay a save, an open or the lock.
+    let (repo, known) = with(&state, |s| {
+        let known = s.open.get(&name).and_then(|(_, sha)| sha.clone()).ok_or("Cofre não está aberto.")?;
+        Ok((s.repo.clone(), known))
+    })?;
+    Ok(match repo.sha(&file_of(&name))? {
+        None => "deleted",
+        Some(sha) if sha == known => "same",
+        Some(_) => "changed",
+    })
 }
 
 /// Sets, changes (Some) or removes (None) a vault's own password by re-encrypting its saved entries with a new key.
@@ -417,7 +432,7 @@ fn main() {
         .manage(LastCopy::default())
         .invoke_handler(tauri::generate_handler![
             saved_login, forget_token, connect, setup_repo, lock, copy_secret, list_vaults, open_vault, set_vault_password, save_vault,
-            create_vault, delete_vault, parse_csv, export_csv, set_layout, open_url
+            create_vault, delete_vault, remote_status, parse_csv, export_csv, set_layout, open_url
         ])
         .build(tauri::generate_context!())
         .expect("erro ao iniciar o URPM")

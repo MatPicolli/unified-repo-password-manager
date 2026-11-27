@@ -8,6 +8,7 @@ use std::time::Duration;
 /// Error text for a stale sha (file changed elsewhere); the UI matches on it to offer a merge.
 pub const CONFLICT: &str = "O cofre foi alterado em outro dispositivo.";
 
+#[derive(Clone)]
 pub struct Repo {
     pub token: String,
     pub name: String, // "owner/repo"
@@ -97,6 +98,19 @@ impl Repo {
         }
         let clean: String = f.content.chars().filter(|c| !c.is_whitespace()).collect();
         Ok((B64.decode(clean).map_err(|e| e.to_string())?, f.sha))
+    }
+
+    /// Current sha of a file, or None if it doesn't exist (cheap way to detect changes made elsewhere).
+    pub fn sha(&self, path: &str) -> Result<Option<String>, String> {
+        #[derive(Deserialize)]
+        struct Meta {
+            sha: String,
+        }
+        match self.req("GET", &format!("/contents/{}", enc(path))).call() {
+            Ok(r) => Ok(Some(r.into_json::<Meta>().map_err(|e| e.to_string())?.sha)),
+            Err(ureq::Error::Status(404, _)) => Ok(None),
+            Err(e) => Err(err(e)),
+        }
     }
 
     /// Creates (sha = None) or updates a file; returns the new sha. A stale sha fails instead of overwriting.
@@ -254,7 +268,9 @@ pub(crate) mod tests {
         repo.delete("big.vault", &sha_big, "delete").unwrap();
 
         assert!(repo.delete(odd, &sha1, "stale delete").is_err());
+        assert_eq!(repo.sha(odd).unwrap(), Some(sha_odd.clone()));
         repo.delete(odd, &sha_odd, "delete").unwrap();
+        assert_eq!(repo.sha(odd).unwrap(), None, "deleted file has no sha");
         assert_eq!(repo.list(".vault").unwrap(), vec!["a.vault"]);
         assert_eq!(repo.get("a.vault").unwrap(), (b"v2".to_vec(), sha2));
     }

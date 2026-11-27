@@ -34,6 +34,7 @@
       <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></symbol>
       <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
       <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></symbol>
+      <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
       <symbol id="i-key" viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.3-9.3M17 6l3 3M14 9l2 2"/></symbol>
     </defs>
   </svg>
@@ -42,6 +43,10 @@
   <header id="titlebar" data-tauri-drag-region>
     <div class="tb-brand" data-tauri-drag-region><svg class="ic"><use href="#i-logo"/></svg><span data-tauri-drag-region>URPM</span></div>
     <div class="tb-title" id="tb-title" data-tauri-drag-region></div>
+    <button id="sync" class="sync main-only ok" type="button" aria-live="polite">
+      <span class="sync-dot"></span><span class="sync-label">Sincronizado</span>
+    </button>
+    <button id="settings-btn" class="tb-gear" type="button" title="Configurações (Ctrl+,)" aria-label="Configurações"><svg class="ic"><use href="#i-gear"/></svg></button>
     <div class="tb-controls">
       <button class="tb-btn" data-win="min" title="Minimizar" aria-label="Minimizar"><svg class="ic"><use href="#i-min"/></svg></button>
       <button class="tb-btn main-only" data-win="max" title="Maximizar" aria-label="Maximizar"><svg class="ic"><use href="#i-max"/></svg></button>
@@ -303,6 +308,54 @@
         <button type="button" id="vd-cancel" class="btn ghost">Cancelar</button>
         <button id="vd-ok" class="btn primary">OK</button>
       </div>
+    </form>
+  </dialog>
+
+  <!-- Configurações (aplicadas na hora, guardadas neste computador) -->
+  <dialog id="settings" class="settings">
+    <form id="settings-form" method="dialog">
+      <div class="settings-head">
+        <h3>Configurações</h3>
+        <button type="button" id="settings-close" class="icon-btn" title="Fechar (Esc)" aria-label="Fechar"><svg class="ic"><use href="#i-x"/></svg></button>
+      </div>
+
+      <h4 class="label-sm">Aparência</h4>
+      <div class="setting">
+        <div class="setting-txt"><b>Tema</b><span>"Sistema" acompanha o modo claro/escuro do Windows.</span></div>
+        <div class="segmented" role="radiogroup" aria-label="Tema">
+          <label><input type="radio" name="theme" value="dark"><span>Escuro</span></label>
+          <label><input type="radio" name="theme" value="light"><span>Claro</span></label>
+          <label><input type="radio" name="theme" value="system"><span>Sistema</span></label>
+        </div>
+      </div>
+      <div class="setting">
+        <div class="setting-txt"><b>Cor de destaque</b><span>Botões, seleção e indicadores.</span></div>
+        <div class="swatches" id="accent-swatches" role="radiogroup" aria-label="Cor de destaque"></div>
+      </div>
+
+      <h4 class="label-sm">Cofres</h4>
+      <div class="setting">
+        <div class="setting-txt"><b>Salvar automaticamente</b><span>Envia ao GitHub alguns segundos depois de cada alteração, sem precisar clicar em Salvar.</span></div>
+        <label class="switch"><input type="checkbox" name="autosave"><i></i></label>
+      </div>
+
+      <h4 class="label-sm">Segurança</h4>
+      <div class="setting">
+        <div class="setting-txt"><b>Bloquear após inatividade</b><span>Volta para a tela de login e esquece as chaves.</span></div>
+        <select name="lockMinutes">
+          <option value="1">1 minuto</option><option value="5">5 minutos</option><option value="10">10 minutos</option>
+          <option value="15">15 minutos</option><option value="30">30 minutos</option><option value="60">1 hora</option>
+        </select>
+      </div>
+      <div class="setting">
+        <div class="setting-txt"><b>Limpar área de transferência</b><span>Depois de copiar uma senha ou usuário.</span></div>
+        <select name="clipSeconds">
+          <option value="10">10 segundos</option><option value="30">30 segundos</option>
+          <option value="60">1 minuto</option><option value="120">2 minutos</option>
+        </select>
+      </div>
+
+      <p class="settings-foot muted">As configurações ficam guardadas neste computador e valem para todos os repositórios.</p>
     </form>
   </dialog>
 
