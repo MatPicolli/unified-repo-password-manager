@@ -64,7 +64,7 @@ impl Repo {
             .set("Authorization", &format!("Bearer {}", self.token))
             .set("Accept", "application/vnd.github+json")
             .set("X-GitHub-Api-Version", "2022-11-28")
-            .set("User-Agent", "urpm/3.0")
+            .set("User-Agent", concat!("urpm/", env!("CARGO_PKG_VERSION")))
     }
 
     /// Checks access; returns whether the repo is private.
