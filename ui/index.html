@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>URPM</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+</head>
+<body class="mode-login">
+  <!-- Ícones (estilo Lucide, traço 2px) -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-logo" viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5z"/><circle cx="12" cy="10.5" r="2"/><path d="M12 12.5V15"/></symbol>
+      <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+      <symbol id="i-min" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+      <symbol id="i-max" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="1.5"/></symbol>
+      <symbol id="i-restore" viewBox="0 0 24 24"><rect x="4" y="8" width="12" height="12" rx="1.5"/><path d="M8 8V5.5A1.5 1.5 0 0 1 9.5 4h9A1.5 1.5 0 0 1 20 5.5v9a1.5 1.5 0 0 1-1.5 1.5H16"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+      <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+      <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.9 5.1A10.8 10.8 0 0 1 12 5c6.5 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.2M6.6 6.6A17.4 17.4 0 0 0 2 12s3.5 7 10 7a10.6 10.6 0 0 0 5.4-1.4"/></symbol>
+      <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9z"/></symbol>
+      <symbol id="i-edit" viewBox="0 0 24 24"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></symbol>
+      <symbol id="i-external" viewBox="0 0 24 24"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
+      <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+      <symbol id="i-tag" viewBox="0 0 24 24"><path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="7.5" cy="7.5" r="1.5"/></symbol>
+      <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 2 10 5-10 5L2 7z"/><path d="m2 17 10 5 10-5M2 12l10 5 10-5"/></symbol>
+      <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></symbol>
+      <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V3M7 8l5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+      <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></symbol>
+      <symbol id="i-key" viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.3-9.3M17 6l3 3M14 9l2 2"/></symbol>
+    </defs>
+  </svg>
+
+  <!-- Barra de título própria (arrastável; duplo clique maximiza na tela principal) -->
+  <header id="titlebar" data-tauri-drag-region>
+    <div class="tb-brand" data-tauri-drag-region><svg class="ic"><use href="#i-logo"/></svg><span data-tauri-drag-region>URPM</span></div>
+    <div class="tb-title" id="tb-title" data-tauri-drag-region></div>
+    <div class="tb-controls">
+      <button class="tb-btn" data-win="min" title="Minimizar" aria-label="Minimizar"><svg class="ic"><use href="#i-min"/></svg></button>
+      <button class="tb-btn main-only" data-win="max" title="Maximizar" aria-label="Maximizar"><svg class="ic"><use href="#i-max"/></svg></button>
+      <button class="tb-btn close" data-win="close" title="Fechar" aria-label="Fechar"><svg class="ic"><use href="#i-x"/></svg></button>
+    </div>
+  </header>
+
+  <!-- ===== Login (janela pequena) ===== -->
+  <section id="login" class="view">
+    <form id="login-form" autocomplete="off" novalidate>
+      <div class="hero">
+        <div class="hero-logo"><svg class="ic"><use href="#i-logo"/></svg></div>
+        <h1>Bem-vindo de volta</h1>
+        <p class="muted">Desbloqueie seus cofres</p>
+      </div>
+
+      <div id="account-summary" class="account hidden">
+        <div class="account-info">
+          <span class="label-sm">Repositório</span>
+          <span id="account-repo" class="mono"></span>
+        </div>
+        <button type="button" id="account-change" class="btn ghost sm">Trocar</button>
+      </div>
+
+      <div id="account-fields">
+        <label class="field">
+          <span>Repositório do GitHub</span>
+          <input id="repo" placeholder="usuario/repositorio" spellcheck="false">
+        </label>
+        <label class="field">
+          <span>Token de acesso</span>
+          <input id="token" type="password" placeholder="github_pat_…" spellcheck="false">
+        </label>
+        <div class="row between">
+          <label class="switch"><input id="remember" type="checkbox" checked><i></i> Lembrar token</label>
+          <button type="button" id="forget" class="link hidden">Esquecer token salvo</button>
+        </div>
+      </div>
+
+      <label class="field">
+        <span>Senha mestra</span>
+        <div class="input-wrap">
+          <input id="master" type="password" placeholder="••••••••••••" spellcheck="false">
+          <button type="button" class="icon-btn" data-reveal="master" title="Mostrar senha" aria-label="Mostrar senha"><svg class="ic"><use href="#i-eye"/></svg></button>
+        </div>
+      </label>
+      <p id="caps" class="hint warn hidden"><svg class="ic"><use href="#i-alert"/></svg> Caps Lock está ativado</p>
+
+      <button id="connect" class="btn primary block lg">
+        <span class="spinner"></span><span class="btn-label">Desbloquear</span>
+      </button>
+      <p id="login-msg" class="form-error" role="alert"></p>
+
+      <p class="foot muted">Argon2id · XChaCha20-Poly1305 · GitHub privado</p>
+    </form>
+  </section>
+
+  <!-- ===== Configuração de repositório novo (janela pequena) ===== -->
+  <section id="setup" class="view hidden">
+    <form id="setup-form" autocomplete="off" novalidate>
+      <div class="hero">
+        <div class="hero-logo"><svg class="ic"><use href="#i-key"/></svg></div>
+        <h1>Novo repositório</h1>
+        <p class="muted">Crie a senha mestra de <b id="setup-repo" class="mono"></b></p>
+      </div>
+      <p id="setup-other" class="hint info hidden"></p>
+
+      <label class="field">
+        <span>Senha mestra</span>
+        <div class="input-wrap">
+          <input id="setup-master" type="password" placeholder="Uma frase longa e fácil de lembrar" spellcheck="false">
+          <button type="button" class="icon-btn" data-reveal="setup-master" title="Mostrar senha" aria-label="Mostrar senha"><svg class="ic"><use href="#i-eye"/></svg></button>
+        </div>
+        <div class="strength" id="setup-strength"><div class="bar"><i></i></div><span></span></div>
+      </label>
+      <label class="field">
+        <span>Confirme a senha mestra</span>
+        <input id="setup-confirm" type="password" spellcheck="false">
+      </label>
+      <label class="field">
+        <span>Nome do primeiro cofre</span>
+        <input id="setup-vault" value="Pessoal" spellcheck="false">
+      </label>
+
+      <div class="callout"><svg class="ic"><use href="#i-alert"/></svg><span>Não existe recuperação: se você esquecer a senha mestra, ninguém consegue abrir estes cofres. Ela vale só para este repositório.</span></div>
+
+      <button id="setup-ok" class="btn primary block lg"><span class="spinner"></span><span class="btn-label">Criar e entrar</span></button>
+      <p id="setup-msg" class="form-error" role="alert"></p>
+      <button type="button" id="setup-back" class="link center">Voltar</button>
+    </form>
+  </section>
+
+  <!-- ===== Gerenciador (janela grande) ===== -->
+  <section id="app" class="view hidden">
+    <!-- Coluna 1: cofres e filtros -->
+    <aside class="sidebar">
+      <div class="side-head">
+        <span class="label-sm">Cofres</span>
+        <button id="new-vault" class="icon-btn sm" title="Novo cofre" aria-label="Novo cofre"><svg class="ic"><use href="#i-plus"/></svg></button>
+      </div>
+      <nav id="vaults" class="nav"></nav>
+
+      <div id="filters-block" class="hidden">
+        <div class="side-head"><span class="label-sm">Filtros</span></div>
+        <nav id="filters" class="nav"></nav>
+      </div>
+
+      <div class="side-foot">
+        <div class="repo-chip" title="Repositório conectado"><span class="dot"></span><span id="repo-name" class="mono"></span></div>
+        <button id="lock" class="btn ghost block" title="Bloquear (Ctrl+L)"><svg class="ic"><use href="#i-lock"/></svg> Bloquear</button>
+      </div>
+    </aside>
+
+    <!-- Coluna 2: lista de itens -->
+    <section class="list-pane">
+      <div id="no-vault" class="empty">
+        <div class="empty-ic"><svg class="ic"><use href="#i-folder"/></svg></div>
+        <h3>Nenhum cofre aberto</h3>
+        <p class="muted">Escolha um cofre na lateral ou crie um novo.</p>
+        <button id="empty-new-vault" class="btn primary"><svg class="ic"><use href="#i-plus"/></svg> Criar cofre</button>
+      </div>
+
+      <div id="list-wrap" class="hidden">
+        <div class="list-head">
+          <div class="row between">
+            <div>
+              <h2 id="vault-title"></h2>
+              <span id="vault-count" class="muted sm"></span>
+            </div>
+            <div class="row">
+              <button id="new-entry" class="btn primary sm" title="Novo item (Ctrl+N)"><svg class="ic"><use href="#i-plus"/></svg> Novo</button>
+              <div class="menu-anchor">
+                <button id="vault-menu-btn" class="icon-btn" title="Mais opções" aria-label="Mais opções"><svg class="ic"><use href="#i-more"/></svg></button>
+                <div id="vault-menu" class="menu hidden" role="menu">
+                  <button data-act="import" role="menuitem"><svg class="ic"><use href="#i-upload"/></svg> Importar CSV</button>
+                  <button data-act="export" role="menuitem"><svg class="ic"><use href="#i-download"/></svg> Exportar CSV</button>
+                  <button data-act="password" role="menuitem"><svg class="ic"><use href="#i-lock"/></svg> Senha do cofre…</button>
+                  <hr>
+                  <button data-act="delete" class="danger" role="menuitem"><svg class="ic"><use href="#i-trash"/></svg> Apagar cofre</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="search">
+            <svg class="ic"><use href="#i-search"/></svg>
+            <input id="search" type="search" placeholder="Buscar…" spellcheck="false">
+            <kbd>Ctrl F</kbd>
+          </div>
+        </div>
+        <div id="rows" class="rows" role="listbox" tabindex="0"></div>
+        <div id="no-rows" class="empty small hidden">
+          <p class="muted" id="no-rows-msg"></p>
+        </div>
+        <div id="unsaved" class="unsaved hidden">
+          <span><span class="pulse"></span> Alterações não salvas</span>
+          <div class="row">
+            <button id="discard" class="btn ghost sm">Descartar</button>
+            <button id="save" class="btn primary sm" title="Ctrl+S">Salvar</button>
+          </div>
+        </div>
+        <input id="import-file" type="file" accept=".csv,text/csv" class="hidden">
+      </div>
+    </section>
+
+    <!-- Coluna 3: detalhe / edição -->
+    <section class="detail-pane">
+      <div id="detail-empty" class="empty">
+        <div class="empty-ic"><svg class="ic"><use href="#i-key"/></svg></div>
+        <h3>Nenhum item selecionado</h3>
+        <p class="muted">Selecione um item para ver os detalhes.</p>
+        <div class="shortcuts muted">
+          <span><kbd>Ctrl N</kbd> novo item</span>
+          <span><kbd>↑ ↓</kbd> navegar</span>
+          <span><kbd>Ctrl Shift C</kbd> copiar senha</span>
+          <span><kbd>Ctrl Shift U</kbd> copiar usuário</span>
+          <span><kbd>Ctrl S</kbd> salvar</span>
+          <span><kbd>Ctrl L</kbd> bloquear</span>
+        </div>
+      </div>
+
+      <div id="detail" class="detail hidden"></div>
+
+      <form id="editor" class="detail editor hidden" autocomplete="off" novalidate>
+        <div class="detail-head">
+          <h2 id="editor-title">Novo item</h2>
+        </div>
+        <div class="form-grid">
+          <label class="field span2"><span>Nome *</span><input name="name" placeholder="Ex.: GitHub, Banco, Netflix" spellcheck="false"></label>
+          <label class="field span2"><span>Site</span><input name="url" placeholder="https://exemplo.com" spellcheck="false"></label>
+          <label class="field"><span>Usuário</span><input name="username" spellcheck="false"></label>
+          <label class="field"><span>E-mail</span><input name="email" spellcheck="false"></label>
+          <div class="field span2">
+            <span>Senha</span>
+            <div class="input-wrap">
+              <input name="password" type="password" class="mono" spellcheck="false">
+              <button type="button" class="icon-btn" data-reveal="password" title="Mostrar senha" aria-label="Mostrar senha"><svg class="ic"><use href="#i-eye"/></svg></button>
+              <button type="button" class="icon-btn" id="gen-toggle" title="Gerador de senhas" aria-label="Gerador de senhas"><svg class="ic"><use href="#i-refresh"/></svg></button>
+            </div>
+            <div class="strength" id="strength"><div class="bar"><i></i></div><span></span></div>
+            <div id="generator" class="generator hidden">
+              <div class="row between">
+                <span class="label-sm">Gerador</span>
+                <span class="mono sm" id="gen-len-label">20 caracteres</span>
+              </div>
+              <input type="range" id="gen-len" min="8" max="64" value="20">
+              <div class="row wrap">
+                <label class="switch sm"><input type="checkbox" id="gen-upper" checked><i></i> A–Z</label>
+                <label class="switch sm"><input type="checkbox" id="gen-digits" checked><i></i> 0–9</label>
+                <label class="switch sm"><input type="checkbox" id="gen-symbols" checked><i></i> !@#</label>
+                <label class="switch sm"><input type="checkbox" id="gen-ambig" checked><i></i> Evitar ambíguos</label>
+              </div>
+              <button type="button" id="gen-again" class="btn ghost sm"><svg class="ic"><use href="#i-refresh"/></svg> Gerar outra</button>
+            </div>
+          </div>
+          <label class="field"><span>Tag</span><input name="tag" list="tag-list" spellcheck="false"></label>
+          <label class="switch field-switch"><input name="favorite" type="checkbox"><i></i> Favorito</label>
+          <datalist id="tag-list"></datalist>
+          <label class="field span2"><span>Notas</span><textarea name="notes" rows="5" placeholder="Perguntas de segurança, códigos de recuperação…"></textarea></label>
+        </div>
+        <p id="editor-msg" class="form-error"></p>
+        <div class="editor-actions">
+          <button type="button" id="editor-cancel" class="btn ghost">Cancelar <kbd>Esc</kbd></button>
+          <button id="editor-ok" class="btn primary">Concluir <kbd>Ctrl ↵</kbd></button>
+        </div>
+      </form>
+    </section>
+  </section>
+
+  <!-- Diálogo genérico (confirmar / pedir texto) -->
+  <dialog id="modal">
+    <form method="dialog" id="modal-form" novalidate>
+      <div class="modal-ic" id="modal-ic"><svg class="ic"><use href="#i-alert"/></svg></div>
+      <h3 id="modal-title"></h3>
+      <p id="modal-msg" class="muted"></p>
+      <div class="input-wrap hidden" id="modal-input-wrap"><input id="modal-input" spellcheck="false"></div>
+      <p id="modal-err" class="form-error"></p>
+      <div class="modal-actions">
+        <button type="button" id="modal-cancel" class="btn ghost">Cancelar</button>
+        <button id="modal-ok" class="btn primary">OK</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Criar cofre / definir senha do cofre -->
+  <dialog id="vault-dialog">
+    <form id="vault-form" novalidate autocomplete="off">
+      <div class="modal-ic"><svg class="ic"><use href="#i-lock"/></svg></div>
+      <h3 id="vd-title"></h3>
+      <p id="vd-msg" class="muted"></p>
+      <label class="field" id="vd-name-field"><span>Nome do cofre</span><input name="name" placeholder="Ex.: Pessoal, Trabalho" spellcheck="false"></label>
+      <label class="switch"><input type="checkbox" name="protect"><i></i> Proteger com senha própria</label>
+      <div id="vd-pass" class="vd-pass hidden">
+        <p class="muted sm">Pedida toda vez que o cofre for aberto, além da senha mestra. Ela entra na criptografia: sem ela, o cofre não abre.</p>
+        <label class="field"><span>Senha do cofre</span><input name="password" type="password" spellcheck="false"></label>
+        <label class="field"><span>Confirme</span><input name="confirm" type="password" spellcheck="false"></label>
+      </div>
+      <p id="vd-err" class="form-error"></p>
+      <div class="modal-actions">
+        <button type="button" id="vd-cancel" class="btn ghost">Cancelar</button>
+        <button id="vd-ok" class="btn primary">OK</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toasts" aria-live="polite"></div>
+  <div id="progress"></div>
+</body>
+</html>

@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "URPM",
+  "version": "3.0.0",
+  "identifier": "app.urpm.senhas",
+  "build": {
+    "frontendDist": "ui"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "URPM",
+        "width": 400,
+        "height": 620,
+        "resizable": false,
+        "maximizable": false,
+        "decorations": false,
+        "shadow": true,
+        "center": true,
+        "backgroundColor": "#0e1015"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:"
+    }
+  },
+  "bundle": {
+    "active": false,
+    "icon": ["icons/icon.ico"]
+  }
+}
